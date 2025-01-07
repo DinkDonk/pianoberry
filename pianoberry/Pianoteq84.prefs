@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PROPERTIES>
+	<VALUE name="latest_news_check" val="2040-12-28T17:16:30Z"/>
+	<VALUE name="welcome-done-demo" val="1"/>
+	<VALUE name="audio-setup">
+		<DEVICESETUP deviceType="ALSA" audioOutputDeviceName="pisound, PS-30FX3RJ snd-soc-dummy-dai-0; Direct hardware device without any conversions" audioInputDeviceName="" audioDeviceRate="96000.0" audioDeviceBufferSize="256" forceStereo="0"/>
+	</VALUE>
+	<VALUE name="midi-setup">
+		<midi-setup listen-all="1"/>
+		<device name="pisound MIDI PS-30FX3RJ"/>
+	</VALUE>
+	<VALUE name="voices" val="48"/>
+	<VALUE name="voices_thresh" val="100"/>
+	<VALUE name="engine_rate" val="48000"/>
+	<VALUE name="multicore" val="1"/>
+	<VALUE name="cpu_overload_detection" val="0"/>
+	<VALUE name="keep_cpu_hot_percent" val="0"/>
+</PROPERTIES>
