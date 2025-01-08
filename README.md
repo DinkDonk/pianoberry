@@ -26,6 +26,9 @@ Tweaked for ~1.5ms latency at 96kHz sample rate.
 
 ### Building Raspberry PI image
 
+1. Place your Linux Aarch64 Pianoteq 8 binary in the `pianoteq` directory
+2. Build:
+
 ```bash
 ./build
 ```
