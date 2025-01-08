@@ -34,8 +34,8 @@ The image will be created in the `deploy` directory.
 
 ---
 
-<i><small>
+<i><sup>
 Pianoberry includes a trial version of Pianoteq Standard.  
 Pianoteq is redistributed in the image courtesy of Modartt.  
 Please don't redistribute the Pianoteq binary without explicit permission from Modartt.
-</small></i>
+</sup></i>
