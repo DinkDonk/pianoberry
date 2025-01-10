@@ -1,6 +1,30 @@
 #!/bin/sh
 
-if [ "$1" = "--force-rebuild" ] || [ -z "$(docker image ls | grep pianoberry-build)" ]; then
+serial=""
+force_rebuild=0
+initial_preset="U4 Felt II"
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--serial=*)
+			serial="${1#*=}"
+			;;
+		--initial-preset=*)
+			initial_preset="${1#*=}"
+			;;
+		--force-rebuild)
+			force_rebuild=1
+			;;
+		*)
+			printf "***************************\n"
+			printf "* Error: Invalid argument.*\n"
+			printf "***************************\n"
+			exit 1
+	esac
+	shift
+done
+
+if [ $force_rebuild ] || [ -z "$(docker image ls | grep pianoberry-build)" ]; then
   echo "Building pianoberry-build image"
   docker rmi $(docker images | grep 'pianoberry-build' | awk '{print $3}')
   docker build --no-cache -q -t pianoberry-build .
@@ -8,4 +32,4 @@ fi
 
 mkdir -p deploy
 
-docker run --privileged --rm -it -v ./deploy:/build pianoberry-build:latest
+docker run --privileged -e SERIAL=$serial -e INITIAL_PRESET=$initial_preset --rm -it -v ./deploy:/build pianoberry-build:latest
