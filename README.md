@@ -25,6 +25,26 @@ Tweaked for ~1.5ms latency at 96kHz sample rate.
 - [Pianoteq](https://www.modartt.com/pianoteq_overview) Linux Aarch64 binary
 - ARM64 based host machine (Mac M series, Raspberry PI 5, etc.)
 
+### Get build options
+
+```bash
+./build --help
+```
+
+```
+Usage: ./build [options]
+Options:
+  --serial=SERIAL            Pianoteq serial number.
+                             If SERIAL is empty or --serial is not passed,
+                             Pianoteq binary is assumed to be the trial version.
+                             If serial is provided – Make sure you build with the
+                             full version of the Pianoteq binary.
+  --initial-preset=PRESET    Initial preset to load.
+                             defaults to "U4 Felt II".
+  --force-rebuild            Force rebuild of the pianoberry-build image.
+  --help                     Show this help message.
+```
+
 ### Building Raspberry PI image with Pianoteq trial
 
 1. Download the Pianoteq 8 Standard trial for Linux from the [Pianoteq website](https://www.modartt.com/try?file=pianoteq_linux_trial_v840.7z)
@@ -48,26 +68,6 @@ The image will be created in the `deploy` directory.
 ```
 
 The image will be created in the `deploy` directory.
-
-### Get build options
-
-```bash
-./build --help
-```
-
-```
-Usage: ./build [options]
-Options:
-  --serial=SERIAL            Pianoteq serial number.
-                             If SERIAL is empty or --serial is not passed,
-                             Pianoteq binary is assumed to be the trial version.
-                             If serial is provided – Make sure you build with the
-                             full version of the Pianoteq binary.
-  --initial-preset=PRESET    Initial preset to load.
-                             defaults to "U4 Felt II".
-  --force-rebuild            Force rebuild of the pianoberry-build image.
-  --help                     Show this help message.
-```
 
 ### Activating Pianoteq licence
 
