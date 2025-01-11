@@ -1,70 +1,94 @@
 #!/bin/sh
 
+PIANOTEQ_SERIAL=$SERIAL
+PIANOTEQ_INITIAL_PRESET=$INITIAL_PRESET
+
 URL="http://repo.tinycorelinux.net"
 
-echo "Building!"
+PACKAGES="
+	alsa.tcz
+	bzip2-lib.tcz
+	expat2.tcz
+	freetype.tcz
+	glib2.tcz
+	graphite2.tcz
+	harfbuzz.tcz
+	libasound.tcz
+	libdrm.tcz
+	libGLES.tcz
+	liblzma.tcz
+	libpng.tcz
+	libX11.tcz
+	libXau.tcz
+	libXaw.tcz
+	libxcb.tcz
+	libXdmcp.tcz
+	libXext.tcz
+	libXfixes.tcz
+	libxshmfence.tcz
+	libxml2.tcz
+	libXxf86vm.tcz
+	libzstd.tcz
+	llvm19-lib.tcz
+	mesa.tcz
+	pcre2.tcz
+"
 
-cd /pianoberry/pianoberry
+echo "Building with:"
+echo "  serial: ${PIANOTEQ_SERIAL}"
+echo "  initial preset: ${PIANOTEQ_INITIAL_PRESET}"
 
-wget ${URL}/15.x/aarch64/releases/RPi/piCore64-15.0.0.zip
+mkdir -p /build/src
+cd /build/src
+
+function download_file() {
+	if [ ! -f "${1##*/}" ]; then
+		echo "Downloading ${1}"
+		wget ${1}
+		if [[ $? -ne 0 ]]; then
+			echo "Failed to download ${1}"
+			rm -f ${1##*/}
+
+			if [[ $2 -eq 1 ]]; then
+				return 1
+			else
+				exit 1
+			fi
+		fi
+	else
+		echo "${1##*/} already exists, skipping download"
+	fi
+}
 
 function download_tcz() {
-	# Only download if the file doesn't exist
-	if [ ! -f "${1}.tree" ]; then
-		wget ${URL}/15.x/aarch64/tcz/${1}.tree
+	download_file ${URL}/15.x/aarch64/tcz/${1}.tree 1
 
-		if [[ $? -ne 0 ]]; then
-			wget ${URL}/15.x/aarch64/tcz/${1}
-			return
-		fi
+	if [[ $? -ne 0 ]]; then
+		download_file ${URL}/15.x/aarch64/tcz/${1}
+		return
 	fi
 
 	for file in `cat ${1}.tree`; do
-		# Don't download if file exists
-		if [ -f "${file}" ]; then
-			continue
-		fi
-
-		echo "Downloading ${file}"
-		wget ${URL}/15.x/aarch64/tcz/${file}
+		download_file ${URL}/15.x/aarch64/tcz/${file}
 
 		# Check if the file ends with "v8.tcz"
 		if echo "${file}" | grep -q "v8.tcz$"; then
 			# Replace "v8.tcz" with "v8-16k.tcz" and download the additional file
 			additional_file=$(echo "${file}" | sed 's/v8\.tcz$/v8-16k.tcz/')
-			echo "Downloading additional file ${additional_file}"
-			wget ${URL}/15.x/aarch64/tcz/${additional_file}
+			download_file ${URL}/15.x/aarch64/tcz/${additional_file}
 		fi
 	done
 }
 
-download_tcz alsa.tcz
-download_tcz bzip2-lib.tcz
-download_tcz expat2.tcz
-download_tcz freetype.tcz
-download_tcz glib2.tcz
-download_tcz graphite2.tcz
-download_tcz harfbuzz.tcz
-download_tcz libasound.tcz
-download_tcz libdrm.tcz
-download_tcz libGLES.tcz
-download_tcz liblzma.tcz
-download_tcz libpng.tcz
-download_tcz libX11.tcz
-download_tcz libXau.tcz
-download_tcz libXaw.tcz
-download_tcz libxcb.tcz
-download_tcz libXdmcp.tcz
-download_tcz libXext.tcz
-download_tcz libXfixes.tcz
-download_tcz libxshmfence.tcz
-download_tcz libxml2.tcz
-download_tcz libXxf86vm.tcz
-download_tcz libzstd.tcz
-download_tcz llvm19-lib.tcz
-download_tcz pcre2.tcz
+download_file ${URL}/15.x/aarch64/releases/RPi/piCore64-15.0.0.zip
 
-unzip piCore64-15.0.0.zip
+for package in $PACKAGES; do
+	download_tcz $package
+done
+
+cd /pianoberry/pianoberry
+
+unzip /build/src/piCore64-15.0.0.zip
 
 PART1_MB_TO_ADD=20
 PART2_MB_TO_ADD=32
@@ -116,92 +140,53 @@ mount /dev/mapper/${LOOP}p2 p2
 resize2fs /dev/mapper/${LOOP}p1
 resize2fs /dev/mapper/${LOOP}p2
 
+# Set hostname
+echo -n " pianoberry" > p1/cmdline.txt
+
+cd /build/src
+
 function install_tcz() {
 	# Some tczs don't have a .tree file
 	if [ ! -f "${1}.tree" ]; then
-		cp ${1}* p2/tce/optional
+		echo "Installing ${1}"
+		cp ${1}* /pianoberry/pianoberry/p2/tce/optional
 		return
 	fi
 
 	for file in `cat ${1}.tree`; do
 		# Don't copy if file exists
-		if [ -f "p2/tce/optional/${file}" ]; then
+		if [ -f "/pianoberry/pianoberry/p2/tce/optional/${file}" ]; then
 			continue
 		fi
 
-		cp ${file}* p2/tce/optional
+		echo "Installing ${file}"
+		cp ${file}* /pianoberry/pianoberry/p2/tce/optional
 
 		if echo "${file}" | grep -q "v8.tcz$"; then
 			additional_file=$(echo "${file}" | sed 's/v8\.tcz$/v8-16k.tcz/')
-			cp ${additional_file}* p2/tce/optional
+			echo "Installing ${additional_file}"
+			cp ${additional_file}* /pianoberry/pianoberry/p2/tce/optional
 		fi
 	done
 }
 
-install_tcz alsa.tcz
-install_tcz bzip2-lib.tcz
-install_tcz expat2.tcz
-install_tcz freetype.tcz
-install_tcz glib2.tcz
-install_tcz graphite2.tcz
-install_tcz harfbuzz.tcz
-install_tcz libasound.tcz
-install_tcz libdrm.tcz
-install_tcz libGLES.tcz
-install_tcz liblzma.tcz
-install_tcz libpng.tcz
-install_tcz libX11.tcz
-install_tcz libXau.tcz
-install_tcz libXaw.tcz
-install_tcz libxcb.tcz
-install_tcz libXdmcp.tcz
-install_tcz libXext.tcz
-install_tcz libXfixes.tcz
-install_tcz libxshmfence.tcz
-install_tcz libxml2.tcz
-install_tcz libXxf86vm.tcz
-install_tcz libzstd.tcz
-install_tcz llvm19-lib.tcz
-install_tcz pcre2.tcz
+# Install the required extensions
+for package in $PACKAGES; do
+	install_tcz $package
+done
 
-# Enable alsa.tcz and glib1-dev.tcz
-echo "alsa.tcz" >> p2/tce/onboot.lst
-echo "alsa-modules-6.6.47-piCore-v8-16k.tcz" >> p2/tce/onboot.lst
-echo "bzip2-lib.tcz" >> p2/tce/onboot.lst
-echo "expat2.tcz" >> p2/tce/onboot.lst
-echo "glib2.tcz" >> p2/tce/onboot.lst
-echo "graphite2.tcz" >> p2/tce/onboot.lst
-echo "harfbuzz.tcz" >> p2/tce/onboot.lst
-echo "freetype.tcz" >> p2/tce/onboot.lst
-echo "libasound.tcz" >> p2/tce/onboot.lst
-echo "libdrm.tcz" >> p2/tce/onboot.lst
-echo "libGLES.tcz" >> p2/tce/onboot.lst
-echo "liblzma.tcz" >> p2/tce/onboot.lst
-echo "libpng.tcz" >> p2/tce/onboot.lst
-echo "libX11.tcz" >> p2/tce/onboot.lst
-echo "libXau.tcz" >> p2/tce/onboot.lst
-echo "libxcb.tcz" >> p2/tce/onboot.lst
-echo "libXdmcp.tcz" >> p2/tce/onboot.lst
-echo "libXext.tcz" >> p2/tce/onboot.lst
-echo "libXfixes.tcz" >> p2/tce/onboot.lst
-echo "libxshmfence.tcz" >> p2/tce/onboot.lst
-echo "libxml2.tcz" >> p2/tce/onboot.lst
-echo "libXxf86vm.tcz" >> p2/tce/onboot.lst
-echo "libzstd.tcz" >> p2/tce/onboot.lst
-echo "llvm19-lib.tcz" >> p2/tce/onboot.lst
-echo "mesa.tcz" >> p2/tce/onboot.lst
-echo "pcre2.tcz" >> p2/tce/onboot.lst
+# Enable the installed extensions
+for package in $PACKAGES; do
+	echo $package >> /pianoberry/pianoberry/p2/tce/onboot.lst
+done
 
-# Remove openssh
-# rm -f p2/tce/optional/openssh*.*
-# rm -f p2/tce/optional/openssl*.*
-# rm -f p2/tce/optional/ca-certificate*.*
+echo alsa-modules-6.6.47-piCore-v8-16k.tcz >> /pianoberry/pianoberry/p2/tce/onboot.lst
 
 # Disable internal sound card
-sed -i 's/dtparam=audio=on/#dtparam=audio=on/g' p1/config.txt
+sed -i 's/dtparam=audio=on/#dtparam=audio=on/g' /pianoberry/pianoberry/p1/config.txt
 
 # Unpack the rootfs
-mkdir tempdir
+mkdir -p /pianoberry/pianoberry/tempdir
 cd /pianoberry/pianoberry/tempdir
 zcat ../p1/rootfs-piCore64-15.0.gz | cpio -i
 
@@ -221,9 +206,24 @@ cd /pianoberry/pianoberry/mydata
 tar -xpvzf ../mydata.tgz
 
 # Start Pianoteq on boot
+if [ -z "${PIANOTEQ_SERIAL}" ]; then  # If PIANOTEQ_SERIAL is empty run trial
 cat <<EOF >> opt/bootlocal.sh
-sudo "/usr/bin/Pianoteq 8" --headless --preset "U4 Felt II" --midimapping "midi-map"
+sudo "/usr/bin/Pianoteq 8" --headless --preset "${PIANOTEQ_INITIAL_PRESET}" --midimapping "midi-map"
 EOF
+else  # If PIANOTEQ_SERIAL is set, activate the license first
+cat <<EOF >> opt/bootlocal.sh
+if [ ! -f "/opt/.activated" ]; then
+	sudo "/usr/bin/Pianoteq 8" --headless --activate pianoberry:$PIANOTEQ_SERIAL
+	if [[ \$? -eq 0 ]]; then
+		sudo touch /opt/.activated
+		sudo filetool.sh -b
+		sudo reboot
+	fi
+else
+	sudo "/usr/bin/Pianoteq 8" --headless --preset "${PIANOTEQ_INITIAL_PRESET}" --midimapping "midi-map"
+fi
+EOF
+fi
 
 tar -cpvzf ../mydata.tgz .
 
@@ -233,6 +233,8 @@ cp mydata.tgz p2/tce/
 
 # Load pianoberry rootfs instead of the original one
 sed -i 's/rootfs-piCore64-15\.0/rootfs-pianoberry/g' p1/config.txt
+
+echo "Creating the image. This may take a while..."
 
 # Repack the rootfs
 cd tempdir
