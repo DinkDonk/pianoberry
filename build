@@ -1,30 +1,49 @@
 #!/bin/sh
 
-serial=""
-force_rebuild=0
-initial_preset="U4 Felt II"
+SERIAL=""
+FORCE_REBUILD=0
+INITIAL_PRESET="U4 Felt II"
+
+function print_help() {
+	printf "Usage: $0 [options]\n"
+	printf "Options:\n"
+	printf "  --serial=SERIAL            Pianoteq serial number.\n"
+	printf "                             If SERIAL is empty or --serial is not passed,\n"
+	printf "                             Pianoteq binary is assumed to be the trial version.\n"
+	printf "                             If serial is provided – Make sure you build with the\n"
+	printf "                             full version of the Pianoteq binary.\n"
+	printf "  --initial-preset=PRESET    Initial preset to load.\n"
+	printf "                             defaults to \"U4 Felt II\".\n"
+	printf "  --force-rebuild            Force rebuild of the pianoberry-build image.\n"
+	printf "  --help                     Show this help message.\n"
+}
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--serial=*)
-			serial="${1#*=}"
+			SERIAL="${1#*=}"
 			;;
 		--initial-preset=*)
-			initial_preset="${1#*=}"
+			INITIAL_PRESET="${1#*=}"
 			;;
 		--force-rebuild)
-			force_rebuild=1
+			FORCE_REBUILD=1
+			;;
+		--help)
+			print_help
+			exit 0
 			;;
 		*)
 			printf "***************************\n"
 			printf "* Error: Invalid argument.*\n"
-			printf "***************************\n"
+			printf "***************************\n\n"
+			print_help
 			exit 1
 	esac
 	shift
 done
 
-if [ $force_rebuild ] || [ -z "$(docker image ls | grep pianoberry-build)" ]; then
+if [ $FORCE_REBUILD ] || [ -z "$(docker image ls | grep pianoberry-build)" ]; then
   echo "Building pianoberry-build image"
   docker rmi $(docker images | grep 'pianoberry-build' | awk '{print $3}')
   docker build --no-cache -q -t pianoberry-build .
@@ -32,4 +51,4 @@ fi
 
 mkdir -p deploy
 
-docker run --privileged -e SERIAL=$serial -e INITIAL_PRESET=$initial_preset --rm -it -v ./deploy:/build pianoberry-build:latest
+docker run --privileged -e SERIAL=$SERIAL -e INITIAL_PRESET="${INITIAL_PRESET}" --rm -it -v ./deploy:/build pianoberry-build:latest
