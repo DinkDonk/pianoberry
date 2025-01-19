@@ -1,31 +1,16 @@
 #!/bin/sh
 
-SERIAL=""
 FORCE_REBUILD=0
-INITIAL_PRESET="U4 Felt II"
 
 function print_help() {
 	printf "Usage: $0 [options]\n"
 	printf "Options:\n"
-	printf "  --serial=SERIAL            Pianoteq serial number.\n"
-	printf "                             If SERIAL is empty or --serial is not passed,\n"
-	printf "                             Pianoteq binary is assumed to be the trial version.\n"
-	printf "                             If serial is provided – Make sure you build with the\n"
-	printf "                             full version of the Pianoteq binary.\n"
-	printf "  --initial-preset=PRESET    Initial preset to load.\n"
-	printf "                             defaults to \"U4 Felt II\".\n"
 	printf "  --force-rebuild            Force rebuild of the pianoberry-build image.\n"
 	printf "  --help                     Show this help message.\n"
 }
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--serial=*)
-			SERIAL="${1#*=}"
-			;;
-		--initial-preset=*)
-			INITIAL_PRESET="${1#*=}"
-			;;
 		--force-rebuild)
 			FORCE_REBUILD=1
 			;;
@@ -51,4 +36,4 @@ fi
 
 mkdir -p deploy
 
-docker run --privileged -e SERIAL=$SERIAL -e INITIAL_PRESET="${INITIAL_PRESET}" --rm -it -v ./deploy:/build pianoberry-build:latest
+docker run --privileged --rm -it -v ./deploy:/build pianoberry-build:latest

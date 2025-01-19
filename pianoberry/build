@@ -1,8 +1,5 @@
 #!/bin/sh
 
-PIANOTEQ_SERIAL=$SERIAL
-PIANOTEQ_INITIAL_PRESET=$INITIAL_PRESET
-
 URL="http://repo.tinycorelinux.net"
 
 PACKAGES="
@@ -90,55 +87,45 @@ cd /pianoberry/pianoberry
 
 unzip /build/src/piCore64-15.0.0.zip
 
-PART1_MB_TO_ADD=20
-PART2_MB_TO_ADD=32
+dd bs=512 seek=471039 of=pianoberry.img < /dev/null
+parted --script pianoberry.img \
+	mklabel msdos \
+	mkpart primary fat32 8192s 243711s \
+	mkpart primary ext4 243712s 100%
 
-SECTOR_SIZE=512
-PART1_SECTORS_TO_ADD=PART1_SECTORS_TO_ADD=$((PART1_MB_TO_ADD * 1024 * 1024 / SECTOR_SIZE))
-PART2_SECTORS_TO_ADD=PART1_SECTORS_TO_ADD=$((PART2_MB_TO_ADD * 1024 * 1024 / SECTOR_SIZE))
-PART1_END_OLD=172031                                     # Current end for partition 1
-PART1_END_NEW=$((PART1_END_OLD + PART1_SECTORS_TO_ADD))  # New end for partition 1
-PART2_START_OLD=172032                                   # Current start of partition 2
-PART2_SIZE=32768                                         # Size of partition 2 in sectors
-PART2_START_NEW=$((PART1_END_NEW + 1))                   # New start for partition 2
-
-# Add sectors to the image
-dd if=/dev/zero bs=512 count=$((PART1_SECTORS_TO_ADD + PART2_SECTORS_TO_ADD)) >> piCore64-15.0.0.img
-
-# Extract partition 2
-dd if=piCore64-15.0.0.img of=part2.img bs=${SECTOR_SIZE} skip=${PART2_START_OLD} count=${PART2_SIZE}
-
-# Remove partition 2, recreate it at new offset and expand partition 1
-parted --script piCore64-15.0.0.img \
-	unit s \
-	rm 2 \
-	mkpart primary ext4 ${PART2_START_NEW} $((PART2_START_NEW + PART2_SIZE + PART2_SECTORS_TO_ADD - 1)) \
-	resizepart 1 ${PART1_END_NEW}
-
-# Add PART2_SECTORS_TO_ADD sectors to part2.img
-dd if=/dev/zero bs=512 count=${PART2_SECTORS_TO_ADD} >> part2.img
-
-# Write partition 2 back to the image
-dd if=part2.img of=piCore64-15.0.0.img bs=${SECTOR_SIZE} seek=${PART2_START_NEW} conv=notrunc
-
-sync
-
-kpartx -av piCore64-15.0.0.img
-
-fdisk -l piCore64-15.0.0.img  # For debugging
-
-# Mount the image abn extract the loop device name excluding the last two characters (loop0p1 -> loop0)
-LOOP=$(kpartx -av piCore64-15.0.0.img | awk 'NR==1 {print substr($3, 1, length($3)-2)}')
-
-echo "Mounting ${LOOP}p1 and ${LOOP}p2"
+TARGET_LOOP=$(kpartx -av pianoberry.img | awk 'NR==1 {print substr($3, 1, length($3)-2)}')
 
 mkdir -p p1 p2
 
-mount /dev/mapper/${LOOP}p1 p1
-mount /dev/mapper/${LOOP}p2 p2
+mkfs.vfat -F 32 -n pianoberry /dev/mapper/${TARGET_LOOP}p1
+mkfs.ext4 -L data /dev/mapper/${TARGET_LOOP}p2
 
-resize2fs /dev/mapper/${LOOP}p1
-resize2fs /dev/mapper/${LOOP}p2
+mount /dev/mapper/${TARGET_LOOP}p1 p1
+mount /dev/mapper/${TARGET_LOOP}p2 p2
+
+sync
+
+SOURCE_LOOP=$(kpartx -av piCore64-15.0.0.img | awk 'NR==1 {print substr($3, 1, length($3)-2)}')
+
+mkdir -p source_p1 source_p2
+
+mount /dev/mapper/${SOURCE_LOOP}p1 source_p1
+mount /dev/mapper/${SOURCE_LOOP}p2 source_p2
+
+rsync -a source_p1/ p1/
+rsync -a source_p2/ p2/
+
+sync
+
+echo "Source image info:"
+fdisk -l piCore64-15.0.0.img
+df -h source_p1
+df -h source_p2
+
+echo "Target image info:"
+fdisk -l pianoberry.img
+df -h p1
+df -h p2
 
 # Set hostname
 echo -n " pianoberry" > p1/cmdline.txt
@@ -201,29 +188,16 @@ install -m 644 ../midi-map.ptm root/.local/share/Modartt/Pianoteq/MidiMappings/
 install -m 777 "../Pianoteq 8" usr/bin/
 chmod +x "usr/bin/Pianoteq 8"
 
+# Add Pianoteq startup script
+install -m 777 ../startup.sh usr/bin/
+chmod +x "usr/bin/startup.sh"
+
 mkdir -p /pianoberry/pianoberry/mydata
 cd /pianoberry/pianoberry/mydata
 tar -xpvzf ../mydata.tgz
 
 # Start Pianoteq on boot
-if [ -z "${PIANOTEQ_SERIAL}" ]; then  # If PIANOTEQ_SERIAL is empty run trial
-cat <<EOF >> opt/bootlocal.sh
-sudo "/usr/bin/Pianoteq 8" --headless --preset "${PIANOTEQ_INITIAL_PRESET}" --midimapping "midi-map"
-EOF
-else  # If PIANOTEQ_SERIAL is set, activate the license first
-cat <<EOF >> opt/bootlocal.sh
-if [ ! -f "/opt/.activated" ]; then
-	sudo "/usr/bin/Pianoteq 8" --headless --activate pianoberry:$PIANOTEQ_SERIAL
-	if [[ \$? -eq 0 ]]; then
-		sudo touch /opt/.activated
-		sudo filetool.sh -b
-		sudo reboot
-	fi
-else
-	sudo "/usr/bin/Pianoteq 8" --headless --preset "${PIANOTEQ_INITIAL_PRESET}" --midimapping "midi-map"
-fi
-EOF
-fi
+echo "/usr/bin/startup.sh" >> opt/bootlocal.sh
 
 tar -cpvzf ../mydata.tgz .
 
@@ -233,6 +207,14 @@ cp mydata.tgz p2/tce/
 
 # Load pianoberry rootfs instead of the original one
 sed -i 's/rootfs-piCore64-15\.0/rootfs-pianoberry/g' p1/config.txt
+
+# Add Pianoberry default configs to pi/config.txt
+cat <<EOF >> p1/config.txt
+
+[PIANOBERRY]
+pianoteq_serial=
+pianoteq_initial_preset=U4 Felt II
+EOF
 
 echo "Creating the image. This may take a while..."
 
@@ -246,8 +228,14 @@ cp rootfs-pianoberry.gz p1/
 
 sync
 
-umount p1 p2
-kpartx -d /dev/${LOOP}
+echo "Pianoberry image info:"
+fdisk -l pianoberry.img
+df -h p1
+df -h p2
+
+umount p1 p2 source_p1 source_p2
+kpartx -d /dev/${SOURCE_LOOP}
+kpartx -d /dev/${TARGET_LOOP}
 
 # Copy the image to the host
-cp piCore64-15.0.0.img /build/pianoberry.img
+cp pianoberry.img /build/pianoberry.img

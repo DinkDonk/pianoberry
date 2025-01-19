@@ -7,7 +7,8 @@ RUN apk add --no-cache \
 		advancecomp \
 		multipath-tools \
 		parted \
-		e2fsprogs-extra
+		e2fsprogs-extra \
+		rsync
 
 VOLUME /build
 
